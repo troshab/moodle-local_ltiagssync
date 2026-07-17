@@ -1,61 +1,66 @@
-# local_ltiagssync - LTI Advantage per-activity grade sync
+<!-- In English: [README.en.md](README.en.md) -->
+# local_ltiagssync - поелементна синхронізація оцінок через LTI Advantage
 
-Provider-side companion for Moodle's **Publish as LTI tool** (`enrol_lti`). When a whole course is
-shared over LTI 1.3, stock `enrol_lti` reports only the **course total** as a single AGS line item, so
-the consumer platform's gradebook shows one aggregate column. This plugin additionally reports **every
-graded activity as its own decoupled AGS line item**, so the consumer renders a separate gradebook
-column per activity (quiz, assignment, ...).
+Провайдерний компаньйон до Moodle **Publish as LTI tool** (`enrol_lti`). Коли цілий курс шариться через
+LTI 1.3, стоковий `enrol_lti` віддає лише **підсумкову оцінку курсу** одним AGS line item, тож у журналі
+платформи-консюмера видно одну агреговану колонку. Цей плагін додатково віддає **кожну оцінювану
+активність окремим decoupled AGS line item**, тож консюмер показує окрему колонку журналу на кожну
+активність (тест, завдання тощо).
 
-## Where to install
+## Куди ставити
 
-On the **provider** Moodle (the one that publishes the course). The consumer needs no plugin - it just
-receives the extra columns through the standard AGS line item service.
+На **провайдерний** Moodle (той, що публікує курс). Консюмеру плагін не потрібен - він отримує додаткові
+колонки через стандартний AGS line item service.
 
-## Requirements
+## Вимоги
 
-- Moodle **4.3+** on the provider (needs the Packback-based `enrol_lti` AGS tool-side sync).
-- `auth_lti` and `enrol_lti` enabled; the course shared as an LTI tool over **LTI 1.3** with grade sync on.
-- On the **consumer**, the external-tool configuration must allow column management:
+- Moodle **4.3+** на провайдері (потрібен Packback-based AGS tool-side sync у `enrol_lti`).
+- Увімкнені `auth_lti` та `enrol_lti`; курс опублікований як LTI-інструмент через **LTI 1.3** з увімкненою
+  синхронізацією оцінок.
+- На **консюмері** конфігурація зовнішнього інструмента має дозволяти керування колонками:
   *IMS LTI Assignment and Grade Services* = **"Grade synchronisation and column management"**
-  (`ltiservice_gradesynchronization = 2`). Without it the consumer will not accept the additional columns.
+  (`ltiservice_gradesynchronization = 2`). Без цього консюмер не прийме додаткові колонки.
 
-## How it works
+## Як працює
 
-- Reuses `enrol_lti`'s LTI 1.3 registration lookup, its resource-link / user repositories and the bundled
-  `Packback\Lti1p3` AGS client - the exact machinery `enrol_lti`'s own tool-side grade sync uses. No JWT,
-  OAuth2 or HTTP code is re-implemented.
-- For each **course-level** shared resource with grade sync enabled, it enumerates the course grade items
-  and creates one **decoupled** line item per activity (stable `resourceId = ltiagssync_gi_<gradeitemid>`),
-  then posts each user's score keyed by their LTI `sub`. Identity mapping is handled by the LTI platform.
-- Two triggers: an hourly **scheduled task** (backfill) and an **observer on `\core\event\user_graded`**
-  for near-real-time delivery (queued with de-duplication).
-- A small state table records the last grade sent per user/activity, so unchanged grades are not re-sent.
-- **Coexists** with stock `enrol_lti`: the course-total column stays; this plugin *adds* the per-activity
-  breakdown.
+- Переюзає з `enrol_lti` пошук LTI 1.3-реєстрації, репозиторії ресурс-лінків і користувачів та вбудований
+  AGS-клієнт `Packback\Lti1p3` - ту саму машинерію, що й власна синхронізація оцінок `enrol_lti`. Жоден
+  JWT/OAuth2/HTTP-код не переписується.
+- Для кожного **курсового** опублікованого ресурсу з увімкненою синхронізацією оцінок плагін перебирає
+  grade items курсу і створює **decoupled** line item на кожну активність (стабільний
+  `resourceId = ltiagssync_gi_<gradeitemid>`), потім надсилає оцінку кожного користувача, прив'язану до
+  його LTI `sub`. Зіставлення особи виконує LTI-платформа.
+- Два тригери: **scheduled-задача кожні 5 хвилин** (backfill) та **observer на
+  `\core\event\user_graded`** для доставки майже в реальному часі (з чергою і дедупом).
+- Невелика таблиця стану запам'ятовує останню надіслану оцінку на пару користувач/активність, тож
+  незмінені оцінки не надсилаються повторно.
+- **Співіснує** зі стоковим `enrol_lti`: колонка-підсумок курсу лишається, плагін *додає* поелементну
+  розбивку.
 
-## Settings
+## Налаштування
 
-*Site administration -> Plugins -> Local plugins -> LTI Advantage per-activity grade sync*
+*Адміністрування сайту -> Плагіни -> Локальні плагіни -> LTI Advantage per-activity grade sync*
 
-- **Enable per-activity grade sync** (default: on).
-- **Include manual grade items** - also sync manually created gradebook columns (default: off).
+- **Enable per-activity grade sync** (типово: увімкнено).
+- **Include manual grade items** - також синхронізувати створені вручну колонки журналу (типово: вимкнено).
 
-## Verify
+## Перевірка
 
 ```bash
 php admin/cli/scheduled_task.php --execute='\local_ltiagssync\task\sync_grades'
 ```
 
-On the consumer, the shared course's gradebook should now show one column per activity. In the consumer
-DB, `mdl_ltiservice_gradebookservices` gains one row per activity line item for that course.
+У консюмера в журналі курсу має з'явитися колонка на кожну активність. У БД консюмера
+`mdl_ltiservice_gradebookservices` отримує рядок на кожен line item активності цього курсу.
 
-## Limitations
+## Обмеження
 
-- Text / "none" grade items are skipped (AGS transmits numeric values only); scale items are sent as their
-  numeric index.
-- Changing an activity's maximum grade does not retro-update an existing line item's `scoreMaximum` (backlog).
+- Текстові / "none" grade items пропускаються (AGS передає лише числові значення); scale-елементи
+  надсилаються як їхній числовий індекс.
+- Зміна максимальної оцінки активності не оновлює `scoreMaximum` уже створеного line item (у беклозі).
 
-## License
+## Ліцензія
 
-Proprietary. Copyright (c) 2026 Trokhym Babych. All rights reserved.
-Not open source - use, copying, or distribution only with written permission.
+Пропрієтарна. Copyright (c) 2026 Trokhym Babych. Усі права застережено.
+Не open source - використання, копіювання чи розповсюдження лише з письмового дозволу власника.
+Див. [LICENSE](LICENSE).
