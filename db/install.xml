@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/ltiagssync/db" VERSION="20260717" COMMENT="LTI Advantage per-activity grade sync"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_ltiagssync_state" COMMENT="Tracks the last per-activity grade sent to a platform so unchanged grades are skipped on later runs.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="toolid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="enrol_lti_tools.id of the shared resource."/>
+        <FIELD NAME="ltiuserid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="enrol_lti_users.id of the platform user."/>
+        <FIELD NAME="gradeitemid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="grade_items.id of the activity."/>
+        <FIELD NAME="lastgrade" TYPE="number" LENGTH="10" DECIMALS="5" NOTNULL="false" SEQUENCE="false" COMMENT="Last final grade sent for this user and activity."/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="ltiuser" TYPE="foreign" FIELDS="ltiuserid" REFTABLE="enrol_lti_users" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="ltiuser-gradeitem" UNIQUE="true" FIELDS="ltiuserid, gradeitemid"/>
+        <INDEX NAME="toolid" UNIQUE="false" FIELDS="toolid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
