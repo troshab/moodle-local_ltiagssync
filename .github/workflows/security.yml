@@ -1,0 +1,40 @@
+name: security
+
+# The plugin has no third-party dependencies, so the gate is secrets plus any lock file that may
+# appear later. Weekly so a newly published advisory against a future dependency surfaces on its own.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "29 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_VERSION: "0.76.1"
+  # sha256 of trivy_0.76.1_Linux-64bit.tar.gz from the immutable GitHub release. Pinned by hash and
+  # installed directly instead of aquasecurity/trivy-action: that action's tags and trivy 0.69.4 were
+  # hijacked in March 2026 (GHSA-69fq-xp46-6x23).
+  TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install trivy
+        run: |
+          curl -fsSLo /tmp/trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  /tmp/trivy.tgz" | sha256sum -c -
+          sudo tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          trivy --version
+
+      - name: Repository - secrets and locked dependencies
+        run: trivy fs --scanners vuln,secret --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 .
